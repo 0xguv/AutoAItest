@@ -6,8 +6,8 @@
     <div id="auth-status" data-is-authenticated="{{ current_user.is_authenticated | tojson }}" style="display:none;"></div>
     <div id="register-url-data" data-register-url="{{ url_for('register') }}" style="display:none;"></div>
     <div class="max-w-3xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-md">
-        <h1 class="text-2xl font-bold text-gray-900 mb-1">Auto Caption</h1>
-        <p class="text-sm text-gray-600 mb-4">Generate subtitles for your videos quickly and easily.</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-1"></h1>
+        <p class="text-sm text-gray-600 mb-4"></p>
             
         <form id="upload-form" method="post" action="/upload" enctype="multipart/form-data" class="space-y-4">
             <div class="form-group">
@@ -52,7 +52,7 @@
             
             <button type="submit" id="submit-button" class="w-full bg-[#18181b] text-white font-medium py-2 rounded-md hover:bg-gray-800 transition text-sm">
                 <span class="flex items-center justify-center">
-                    <span class="spinner hidden"></span> Process Video
+                    <span class="spinner hidden"></span> Process
                 </span>
             </button>
         </form>
@@ -135,7 +135,7 @@
 
             submitButton.disabled = true;
             spinner.classList.remove('hidden');
-            submitButton.querySelector('span').lastChild.textContent = ' Processing...'; // Update button text
+            submitButton.querySelector('span').lastChild.textContent = ' Processing'; // Update button text
             processingPopup.classList.remove('hidden'); // Show processing popup
             processingOverlay.classList.remove('hidden'); // Show processing overlay
             globalStatsDiv.style.display = 'none'; // Also hide global stats during processing
@@ -414,7 +414,7 @@
             processingOverlay.classList.add('hidden');
             submitButton.disabled = false;
             spinner.classList.add('hidden');
-            submitButton.querySelector('span').lastChild.textContent = ' Process Video';
+            submitButton.querySelector('span').lastChild.textContent = ' Process';
             // Removed: jobStatusAreaDiv.style.display = 'block';
             globalStatsDiv.style.display = 'block'; // Keep global stats visible
         }
