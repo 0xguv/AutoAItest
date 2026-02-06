@@ -116,6 +116,15 @@
         </div>
     </div>
     <textarea id="srt-raw-content" style="display:none;">{{ srt_content | e }}</textarea>
+
+    <!-- Custom Processing Popup for Editor -->
+    <div id="editor-processing-overlay" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div id="editor-processing-popup" class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm w-full relative">
+            <div id="editor-popup-spinner" class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+            <p id="editor-popup-message" class="text-gray-800 font-semibold text-lg mb-2">Robot says: Beep. Boop. Processing video...</p>
+            <p id="editor-popup-submessage" class="text-gray-600 text-sm">Please do not close this page.</p>
+        </div>
+    </div>
 {% endblock %}
 
 {% block page_scripts %}
@@ -126,6 +135,28 @@
         const saveBurnButton = document.getElementById('save-burn-button');
         const spinner = saveBurnButton.querySelector('.spinner');
         const srtRawContentElement = document.getElementById('srt-raw-content');
+
+        // New popup elements
+        const editorProcessingOverlay = document.getElementById('editor-processing-overlay');
+        const editorProcessingPopup = document.getElementById('editor-processing-popup');
+        const editorPopupSpinner = document.getElementById('editor-popup-spinner');
+        const editorPopupMessage = document.getElementById('editor-popup-message');
+        const editorPopupSubmessage = document.getElementById('editor-popup-submessage');
+
+        function showEditorPopup(message, submessage = '', showSpinner = false) {
+            editorPopupMessage.textContent = message;
+            editorPopupSubmessage.textContent = submessage;
+            if (showSpinner) {
+                editorPopupSpinner.classList.remove('hidden');
+            } else {
+                editorPopupSpinner.classList.add('hidden');
+            }
+            editorProcessingOverlay.classList.remove('hidden');
+        }
+
+        function hideEditorPopup() {
+            editorProcessingOverlay.classList.add('hidden');
+        }
 
         let subtitles = []; // Array to hold subtitle objects { index, start, end, text, originalText, position }
         let currentSubtitleIndex = -1;
@@ -368,15 +399,16 @@
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    alert("Robot says: Beep. Boop. Video generation started! Please wait...");
-                    // Start polling for the job status to trigger download
-                    startPollingForBurnJob(job_id); // New function to handle polling for this specific job
+                    showEditorPopup("Robot says: Beep. Boop. Video generation started!", "Please do not close this page.", true);
+                    startPollingForBurnJob(job_id);
                 } else {
-                    alert('Error generating video: ' + (data.message || 'Unknown error'));
+                    showEditorPopup("Error generating video", data.message || 'Unknown error', false);
+                    setTimeout(hideEditorPopup, 3000); // Hide error after 3 seconds
                 }
             } catch (error) {
                 console.error('Error during generation:', error);
-                alert('An error occurred during video generation.');
+                showEditorPopup("An error occurred", 'During video generation.', false);
+                setTimeout(hideEditorPopup, 3000); // Hide error after 3 seconds
             } finally {
                 saveBurnButton.disabled = false;
                 spinner.classList.add('hidden');
@@ -387,7 +419,6 @@
         let burnJobPollingInterval = null;
 
         function startPollingForBurnJob(burnJobId) {
-            // Clear any existing polling interval to avoid multiple intervals running
             if (burnJobPollingInterval) {
                 clearInterval(burnJobPollingInterval);
             }
@@ -398,31 +429,36 @@
                     const jobData = await jobResponse.json();
 
                     if (jobData.status === 'completed') {
-                        clearInterval(burnJobPollingInterval); // Stop polling
-                        alert("Robot says: Beep. Boop. Your video is ready for download!");
+                        clearInterval(burnJobPollingInterval);
+                        hideEditorPopup(); // Hide popup on completion
+                        showEditorPopup("Robot says: Beep. Boop. Your video is ready for download!", "Download will start shortly.", false);
+                        setTimeout(hideEditorPopup, 3000); // Hide success message after 3 seconds
                         if (jobData.result && jobData.result.video_url) {
                             const link = document.createElement('a');
                             link.href = jobData.result.video_url;
-                            // Attempt to use original filename for download, fallback to a generic name
                             link.download = `subtitled_${original_filename.split('.').slice(0, -1).join('.') || 'video'}.mp4`;
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
                         } else {
-                            alert("Robot says: Error. Video completed but no download link found.");
+                            showEditorPopup("Robot says: Error.", "Video completed but no download link found.", false);
+                            setTimeout(hideEditorPopup, 3000);
                         }
-                        // Optionally redirect or provide further UI update
                     } else if (jobData.status === 'failed') {
-                        clearInterval(burnJobPollingInterval); // Stop polling
-                        alert(`Robot says: Error. Video generation failed: ${jobData.error || 'Unknown error'}.`);
+                        clearInterval(burnJobPollingInterval);
+                        hideEditorPopup(); // Hide popup on failure
+                        showEditorPopup("Robot says: Error.", `Video generation failed: ${jobData.error || 'Unknown error'}.`, false);
+                        setTimeout(hideEditorPopup, 5000); // Keep error message longer
                     }
-                    // Else, still processing, continue polling
+                    // Else, still processing, continue polling (popup remains visible from initial call)
                 } catch (error) {
                     console.error('Error polling burn job status:', error);
-                    clearInterval(burnJobPollingInterval); // Stop polling on error
-                    alert("Robot says: Error. Could not check video generation status.");
+                    clearInterval(burnJobPollingInterval);
+                    hideEditorPopup(); // Hide popup on error
+                    showEditorPopup("Robot says: Error.", "Could not check video generation status.", false);
+                    setTimeout(hideEditorPopup, 5000);
                 }
-            }, 5000); // Poll every 5 seconds
+            }, 5000);
         }
 
 
