@@ -131,7 +131,7 @@
             if (!isAuthenticated) { // New authentication check
                 alert("Please sign up or sign in to process videos."); // Simple alert for now
                 const registerUrlDiv = document.getElementById('register-url-data');
-                window.location.href = registerUrlDiv ? registerUrlDiv.dataset.registerUrl : "{{ url_for('register') }}"; // Fallback just in case
+                window.location.href = registerUrlDiv.dataset.registerUrl;
                 return; // Stop further execution
             }
 
