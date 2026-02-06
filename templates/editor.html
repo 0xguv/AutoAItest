@@ -117,18 +117,26 @@
         </div>
     </div>
 
+        <textarea id="srt-raw-content" style="display:none;">{{ srt_content }}</textarea>
     <script>
         const videoPlayer = document.getElementById('video-player');
         const subtitleDisplay = document.getElementById('subtitle-display');
         const subtitleEditableArea = document.getElementById('subtitle-editable-area');
         const saveBurnButton = document.getElementById('save-burn-button');
         const spinner = saveBurnButton.querySelector('.spinner');
+        const srtRawContentElement = document.getElementById('srt-raw-content');
 
         let subtitles = []; // Array to hold subtitle objects { index, start, end, text, originalText, position }
         let currentSubtitleIndex = -1;
         const job_id = "{{ job_id }}";
         const resolution = "{{ resolution }}"; // Passed from Flask for burning
         const language = "{{ language }}"; // Passed from Flask for burning
+
+        // Function to parse SRT content
+        function parseSrt(srtContent) {
+            const lines = srtContent.trim().split(/\r?\n/);
+            let current = {};
+            let srtArray = [];
 
         // Function to parse SRT content
         function parseSrt(srtContent) {
@@ -204,7 +212,7 @@
 
         // Load subtitles from Flask-provided content
         function loadSubtitles() {
-            const srtContent = {{ srt_content | tojson }}; // Escaped SRT content
+            const srtContent = srtRawContentElement.value; // Read from hidden textarea
             subtitles = parseSrt(srtContent);
             renderEditableSubtitles();
         }
