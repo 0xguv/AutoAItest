@@ -368,20 +368,64 @@
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    // Redirect to a status page or display success message
-                    window.location.href = `/?message=${encodeURIComponent('Video generation started!')}&job_id=${data.job_id}`; // Changed message
+                    alert("Robot says: Beep. Boop. Video generation started! Please wait...");
+                    // Start polling for the job status to trigger download
+                    startPollingForBurnJob(job_id); // New function to handle polling for this specific job
                 } else {
-                    alert('Error generating video: ' + (data.message || 'Unknown error')); // Changed message
+                    alert('Error generating video: ' + (data.message || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Error during generation:', error); // Changed message
-                alert('An error occurred during video generation.'); // Changed message
+                console.error('Error during generation:', error);
+                alert('An error occurred during video generation.');
             } finally {
                 saveBurnButton.disabled = false;
                 spinner.classList.add('hidden');
-                saveBurnButton.querySelector('span').lastChild.textContent = ' Generate Video'; // Changed text
+                saveBurnButton.querySelector('span').lastChild.textContent = ' Generate Video';
             }
         });
+
+        let burnJobPollingInterval = null;
+
+        function startPollingForBurnJob(burnJobId) {
+            // Clear any existing polling interval to avoid multiple intervals running
+            if (burnJobPollingInterval) {
+                clearInterval(burnJobPollingInterval);
+            }
+
+            burnJobPollingInterval = setInterval(async () => {
+                try {
+                    const jobResponse = await fetch(`/api/job_status/${burnJobId}`);
+                    const jobData = await jobResponse.json();
+
+                    if (jobData.status === 'completed') {
+                        clearInterval(burnJobPollingInterval); // Stop polling
+                        alert("Robot says: Beep. Boop. Your video is ready for download!");
+                        if (jobData.result && jobData.result.video_url) {
+                            const link = document.createElement('a');
+                            link.href = jobData.result.video_url;
+                            // Attempt to use original filename for download, fallback to a generic name
+                            link.download = `subtitled_${original_filename.split('.').slice(0, -1).join('.') || 'video'}.mp4`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        } else {
+                            alert("Robot says: Error. Video completed but no download link found.");
+                        }
+                        // Optionally redirect or provide further UI update
+                    } else if (jobData.status === 'failed') {
+                        clearInterval(burnJobPollingInterval); // Stop polling
+                        alert(`Robot says: Error. Video generation failed: ${jobData.error || 'Unknown error'}.`);
+                    }
+                    // Else, still processing, continue polling
+                } catch (error) {
+                    console.error('Error polling burn job status:', error);
+                    clearInterval(burnJobPollingInterval); // Stop polling on error
+                    alert("Robot says: Error. Could not check video generation status.");
+                }
+            }, 5000); // Poll every 5 seconds
+        }
+
+
 
         // Initialize
         loadSubtitles();
