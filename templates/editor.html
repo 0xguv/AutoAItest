@@ -1,111 +1,104 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Subtitles - Auto Caption</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .video-container {
-            position: relative;
-            width: 100%;
-            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
-            background-color: black;
-        }
-        .video-container video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        .subtitle-overlay {
-            position: absolute;
-            bottom: 10%; /* Adjust as needed */
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 1.5rem;
-            text-align: center;
-            pointer-events: none; /* Allows clicks to pass through to video controls */
-            user-select: none;
-        }
-        .subtitle-editable-area {
-            max-height: 400px; /* Or whatever height fits your design */
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            background-color: white;
-            color: black;
-            border-radius: 5px;
-        }
-        .subtitle-line {
-            padding: 5px;
-            margin-bottom: 5px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            position: relative; /* For drag handle if implemented */
-        }
-        .subtitle-line:hover {
-            background-color: #f0f0f0;
-        }
-        .subtitle-line.active {
-            background-color: #e0e7ff; /* Highlight active line */
-        }
-        .subtitle-line textarea {
-            width: 100%;
-            border: none;
-            background-color: transparent;
-            resize: vertical;
-            padding: 0;
-            margin: 0;
-            font-size: 1rem;
-            line-height: 1.5;
-            color: black; /* Ensure text is visible */
-        }
-    </style>
-</head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
-    <div class="max-w-4xl w-full mx-auto bg-white p-6 rounded-lg shadow-md">
+{% extends "base.html" %}
+
+{% block title %}Edit Subtitles - Auto Caption{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* Specific styles for editor page */
+    .video-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+        background-color: black;
+    }
+    .video-container video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .subtitle-overlay {
+        position: absolute;
+        bottom: 10%; /* Adjust as needed */
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 1.5rem;
+        text-align: center;
+        pointer-events: none; /* Allows clicks to pass through to video controls */
+        user-select: none;
+        max-width: 90%; /* Prevent overlay from going too wide */
+    }
+    .subtitle-editable-area {
+        max-height: calc(100vh - 200px); /* Adjust height based on viewport and header/footer */
+        overflow-y: auto;
+        border: 1px solid #e2e8f0; /* tailwind-like border */
+        padding: 1rem;
+        background-color: white;
+        color: black;
+        border-radius: 0.5rem; /* tailwind-like rounded */
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* tailwind-like shadow */
+    }
+    .subtitle-line {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        position: relative;
+        display: flex; /* For better alignment of components */
+        align-items: center;
+    }
+    .subtitle-line:hover {
+        background-color: #f9fafb; /* tailwind-like hover */
+    }
+    .subtitle-line.active {
+        background-color: #e0e7ff; /* Highlight active line */
+    }
+    .subtitle-line textarea {
+        flex-grow: 1; /* Take up remaining space */
+        border: none;
+        background-color: transparent;
+        resize: vertical;
+        padding: 0;
+        margin-left: 0.5rem; /* Space after timestamp */
+        font-size: 1rem;
+        line-height: 1.5;
+        color: black;
+    }
+    .nav-stats-editor { /* Custom class for top-right button wrapper */
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        z-index: 20; /* Above other content */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="nav-stats-editor">
+        <button id="save-burn-button" class="bg-blue-600 text-white font-medium py-2 px-4 rounded-md hover:bg-blue-700 transition text-sm">
+            <span class="flex items-center justify-center">
+                <span class="spinner hidden mr-2"></span> Generate Video
+            </span>
+        </button>
+    </div>
+
+    <div class="max-w-7xl mx-auto w-full bg-white p-6 rounded-lg shadow-md mt-8"> {# Increased max-width for editor #}
         <h1 class="text-2xl font-bold text-gray-900 mb-4">Edit Subtitles for {{ original_filename | e }}</h1>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, msg in messages %}
-                    <div class="
-                        {% if category == 'success' %} bg-green-100 border-green-400 text-green-700
-                        {% elif category == 'error' %} bg-red-100 border-red-400 text-red-700
-                        {% elif category == 'info' %} bg-blue-100 border-blue-400 text-blue-700
-                        {% else %} bg-gray-100 border-gray-400 text-gray-700
-                        {% endif %}
-                        px-3 py-2 rounded relative mb-3 text-sm" role="alert">
-                        <strong class="font-bold">{{ category.capitalize() }}:</strong>
-                        <span class="block sm:inline">{{ msg }}</span>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6"> {# Changed md to lg for breakpoint #}
             <div>
                 <div class="video-container rounded-lg overflow-hidden mb-4">
-                    <video id="video-player" controls preload="metadata">
+                    <video id="video-player" controls preload="metadata" class="w-full">
                         <source src="{{ video_url }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     <div id="subtitle-display" class="subtitle-overlay hidden"></div>
                 </div>
-                <button id="save-burn-button" class="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition text-sm">
-                    <span class="flex items-center justify-center">
-                        <span class="spinner hidden"></span> Save & Burn Subtitles
-                    </span>
-                </button>
             </div>
 
             <div>
@@ -117,6 +110,9 @@
         </div>
     </div>
     <textarea id="srt-raw-content" style="display:none;">{{ srt_content | e }}</textarea>
+{% endblock %}
+
+{% block scripts %}
     <script>
         const videoPlayer = document.getElementById('video-player');
         const subtitleDisplay = document.getElementById('subtitle-display');
@@ -335,7 +331,7 @@
         saveBurnButton.addEventListener('click', async () => {
             saveBurnButton.disabled = true;
             spinner.classList.remove('hidden');
-            saveBurnButton.querySelector('span').lastChild.textContent = ' Burning...';
+            saveBurnButton.querySelector('span').lastChild.textContent = ' Generating...'; // Changed text
 
             const editedSrtContent = generateSrtContent();
             
@@ -365,17 +361,17 @@
 
                 if (data.status === 'success') {
                     // Redirect to a status page or display success message
-                    window.location.href = `/?message=${encodeURIComponent('Subtitles saved and burning started!')}&job_id=${data.job_id}`;
+                    window.location.href = `/?message=${encodeURIComponent('Video generation started!')}&job_id=${data.job_id}`; // Changed message
                 } else {
-                    alert('Error saving and burning subtitles: ' + (data.message || 'Unknown error'));
+                    alert('Error generating video: ' + (data.message || 'Unknown error')); // Changed message
                 }
             } catch (error) {
-                console.error('Error during save and burn:', error);
-                alert('An error occurred during save and burn operation.');
+                console.error('Error during generation:', error); // Changed message
+                alert('An error occurred during video generation.'); // Changed message
             } finally {
                 saveBurnButton.disabled = false;
                 spinner.classList.add('hidden');
-                saveBurnButton.querySelector('span').lastChild.textContent = ' Save & Burn Subtitles';
+                saveBurnButton.querySelector('span').lastChild.textContent = ' Generate Video'; // Changed text
             }
         });
 
@@ -386,5 +382,4 @@
             videoPlayer.currentTime = subtitles[0].start;
         }
     </script>
-</body>
-</html>
+{% endblock %}

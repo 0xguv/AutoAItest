@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Auto Caption{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='modern.css') }}">
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="bg-gray-50 flex sidebar-closed">
+    {% if current_user.is_authenticated %}
+    <button class="mobile-sidebar-toggle fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-black" id="mobile-sidebar-toggle">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    {% endif %}
+    {% if not current_user.is_authenticated %}
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+        <a href="{{ url_for('login') }}" class="btn btn-primary text-sm px-3 py-1.5">Sign In</a>
+    </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+        </div>
+        <div class="sidebar-nav">
+            <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+                <i class="fas fa-home"></i><span>Dashboard</span>
+            </a>
+            <div class="nav-item">
+                <i class="fas fa-coins"></i><span><span class="nav-stat">{% if current_user.max_daily_tries == -1 %}∞{% else %}{{ current_user.max_daily_tries - current_user.daily_tries_count }} Tokens{% endif %}</span></span>
+            </div>
+            <div class="nav-item">
+                <i class="fas fa-clock"></i><span><span class="nav-stat">{{ current_user.max_duration_minutes }} Minutes</span></span>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('profile') }}" class="nav-item {% if request.endpoint == 'profile' %}active{% endif %}">
+                <i class="fas fa-user"></i><span>Profile</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-item">
+                <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="content-area flex-1 flex flex-col justify-center p-4 sm:p-6 pt-[64px]">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <div class="
+                        {% if category == 'success' %} bg-green-100 border-green-400 text-green-700
+                        {% elif category == 'error' %} bg-red-100 border-red-400 text-red-700
+                        {% elif category == 'info' %} bg-blue-100 border-blue-400 text-blue-700
+                        {% else %} bg-gray-100 border-gray-400 text-gray-700
+                        {% endif %}
+                        px-3 py-2 rounded relative mb-3 text-sm" role="alert">
+                        <strong class="font-bold">{{ category.capitalize() }}:</strong>
+                        <span class="block sm:inline">{{ msg }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <div id="processing-overlay" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-[1050] hidden"></div>
+    <div id="processing-popup" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-2 z-[1060] hidden max-w-md">
+        <i class="fas fa-robot text-2xl animate-spin"></i>
+        <span>Beep. Boop.</span>
+    </div>
+
+    <script>
+        const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+        if (mobileSidebarToggle) { // Only add listener if sidebar toggle exists
+            mobileSidebarToggle.addEventListener('click', () => {
+                document.body.classList.toggle('sidebar-open');
+                document.body.classList.toggle('sidebar-closed');
+                mobileSidebarToggle.classList.toggle('active'); /* Toggle active class for hamburger animation */
+            });
+        }
+        document.addEventListener('contextmenu', event => event.preventDefault()); // Prevent right-click context menu
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
