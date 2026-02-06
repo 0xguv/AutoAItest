@@ -75,7 +75,6 @@
         <span>Beep. Boop.</span>
     </div>
 
-    {% block scripts %}
     <script>
         const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
         if (mobileSidebarToggle) { // Only add listener if sidebar toggle exists
@@ -87,6 +86,6 @@
         }
         document.addEventListener('contextmenu', event => event.preventDefault()); // Prevent right-click context menu
     </script>
-    {% endblock %}
+    {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -118,8 +118,7 @@
     <textarea id="srt-raw-content" style="display:none;">{{ srt_content | e }}</textarea>
 {% endblock %}
 
-{% block scripts %}
-    {{ super() }}
+{% block page_scripts %}
     <script>
         const videoPlayer = document.getElementById('video-player');
         const subtitleDisplay = document.getElementById('subtitle-display');
