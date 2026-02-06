@@ -26,21 +26,22 @@
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
         </div>
-                    <div class="sidebar-nav">
-                        <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
-                            <i class="fas fa-home"></i><span>Dashboard</span>
-                        </a>
-                        <div class="nav-item">
-                            <i class="fas fa-coins"></i><span><span class="nav-stat">{% if current_user.max_daily_tries == -1 %}∞{% else %}{{ current_user.max_daily_tries - current_user.daily_tries_count }} Tokens{% endif %}</span></span>
-                        </div>
-                        <div class="nav-item">
-                            <i class="fas fa-clock"></i><span><span class="nav-stat">{{ current_user.max_duration_minutes }} Minutes</span></span>
-                        </div>
-                        {% block sidebar_stats %}{% endblock %}
-                    </div>        <div class="sidebar-footer">
-            <a href="{{ url_for('profile') }}" class="nav-item {% if request.endpoint == 'profile' %}active{% endif %}">
-                <i class="fas fa-user"></i><span>Profile</span>
-            </a>
+                                <div class="sidebar-nav">
+                                    <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+                                        <i class="fas fa-home"></i><span>Dashboard</span>
+                                    </a>
+                                    <div class="nav-item">
+                                        <i class="fas fa-coins"></i><span><span class="nav-stat">{% if current_user.max_daily_tries == -1 %}∞{% else %}{{ current_user.max_daily_tries - current_user.daily_tries_count }} Tokens{% endif %}</span></span>
+                                    </div>
+                                    <div class="nav-item">
+                                        <i class="fas fa-clock"></i><span><span class="nav-stat">{{ current_user.max_duration_minutes }} Minutes</span></span>
+                                    </div>
+                                </div>
+                                {% block sidebar_stats %}{% endblock %}
+                                <div class="sidebar-footer">
+                                    <a href="{{ url_for('profile') }}" class="nav-item {% if request.endpoint == 'profile' %}active{% endif %}">
+                                        <i class="fas fa-user"></i><span>Profile</span>
+                                    </a>
             <a href="{{ url_for('logout') }}" class="nav-item">
                 <i class="fas fa-sign-out-alt"></i><span>Logout</span>
             </a>
