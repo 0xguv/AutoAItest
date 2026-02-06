@@ -70,6 +70,7 @@
 {% endblock %}
 
 {% block scripts %}
+    {{ super() }}
     <script>
         // Custom JS to toggle spinner, etc.
         let current_job_id_to_poll = null; // New global variable to store job ID
