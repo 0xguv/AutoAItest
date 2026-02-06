@@ -1,0 +1,11 @@
+Flask
+Flask-SQLAlchemy
+Flask-Login
+faster-whisper
+gunicorn
+redis
+rq
+psycopg2-binary
+honcho
+Authlib
+requests

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Caption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='modern.css') }}">
+</head>
+<body class="bg-gray-50 flex sidebar-closed">
+    {% if current_user.is_authenticated %}
+    <button class="mobile-sidebar-toggle fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-black" id="mobile-sidebar-toggle">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    {% endif %}
+    {% if not current_user.is_authenticated %}
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+        <a href="{{ url_for('login') }}" class="btn btn-primary text-sm px-3 py-1.5">Sign In</a>
+    </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+        </div>
+        <div class="sidebar-nav">
+            <a href="{{ url_for('index') }}" class="nav-item active">
+                <i class="fas fa-home"></i><span>Dashboard</span>
+            </a>
+            <div class="nav-item">
+                <i class="fas fa-coins"></i><span><span class="nav-stat">{% if current_user.max_daily_tries == -1 %}∞{% else %}{{ current_user.max_daily_tries - current_user.daily_tries_count }} Tokens{% endif %}</span></span>
+            </div>
+            <div class="nav-item">
+                <i class="fas fa-clock"></i><span><span class="nav-stat">{{ current_user.max_duration_minutes }} Minutes</span></span>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('profile') }}" class="nav-item">
+                <i class="fas fa-user"></i><span>Profile</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-item">
+                <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="content-area flex-1 flex flex-col justify-center p-4 sm:p-6 pt-[64px]">
+        <div class="max-w-3xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-md">
+            <h1 class="text-2xl font-bold text-gray-900 mb-1">Auto Caption</h1>
+            <p class="text-sm text-gray-600 mb-4">Generate subtitles for your videos quickly and easily.</p>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, msg in messages %}
+                        <div class="
+                            {% if category == 'success' %} bg-green-100 border-green-400 text-green-700
+                            {% elif category == 'error' %} bg-red-100 border-red-400 text-red-700
+                            {% elif category == 'info' %} bg-blue-100 border-blue-400 text-blue-700
+                            {% else %} bg-gray-100 border-gray-400 text-gray-700
+                            {% endif %}
+                            px-3 py-2 rounded relative mb-3 text-sm" role="alert">
+                            <strong class="font-bold">{{ category.capitalize() }}:</strong>
+                            <span class="block sm:inline">{{ msg }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form id="upload-form" method="post" action="/upload" enctype="multipart/form-data" class="space-y-4">
+                <div class="form-group">
+                    <label for="video_file" class="upload-area flex flex-col items-center justify-center flex-grow">
+                        <svg class="upload-icon w-8 h-8 mx-auto my-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <div id="file-name" class="mt-1 text-sm text-gray-600 overflow-hidden whitespace-nowrap text-ellipsis max-w-full">Drag & Drop or <strong class="text-black">click to browse</strong></div>
+                        <input type="file" id="video_file" name="video_file" accept="video/*" class="hidden" required>
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="resolution" class="block text-xs font-semibold text-gray-900 mb-1">Output Resolution:</label>
+                    <select id="resolution" name="resolution" class="form-control w-full px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-colors bg-white text-gray-900 text-sm">
+                        <option value="original">Original</option>
+                        <option value="1920x1080">1920x1080 (HD)</option>
+                        <option value="1280x720">1280x720 (SD)</option>
+                        <option value="1080x1920">1080x1920 (TikTok/Short/Story)</option>
+                        <option value="640x360">640x360 (Small)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="language" class="block text-xs font-semibold text-gray-900 mb-1">Video Language:</label>
+                    <select id="language" name="language" class="form-control w-full px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-colors bg-white text-gray-900 text-sm">
+                        <option value="">Auto-detect</option>
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ru">Russian</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="id">Indonesian</option>
+                        <option value="ar">Arabic</option>
+                        <option value="hi">Hindi</option>
+                        <option value="tr">Turkish</option>
+                    </select>
+                </div>
+                
+                <button type="submit" id="submit-button" class="w-full bg-[#18181b] text-white font-medium py-2 rounded-md hover:bg-gray-800 transition text-sm">
+                    <span class="flex items-center justify-center">
+                        <span class="spinner hidden"></span> Process Video
+                    </span>
+                </button>
+            </form>
+
+            <div class="status-sections mt-6">
+                <div id="global-stats" class="alert px-3 py-2 rounded relative mb-3 bg-blue-100 border-blue-400 text-blue-700 text-sm text-center" style="display: none;">
+                    Queued: <span id="queued-count">0</span> | Processing: <span id="processing-count">0</span> | Workers: <span id="worker-count">0</span>
+                </div>
+                <div id="download-link-area" class="alert px-3 py-2 rounded relative mb-3 bg-green-100 border-green-400 text-green-700 text-sm text-center hidden">
+                    <span id="download-link-placeholder"></span>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <div id="processing-overlay" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-[1050] hidden"></div>
+    <div id="processing-popup" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-2 z-[1060] hidden max-w-md">
+        <i class="fas fa-robot text-2xl animate-spin"></i>
+        <span>Beep. Boop.</span>
+    </div>
+    <script>
+        // Custom JS to toggle spinner, etc.
+        let current_job_id_to_poll = null; // New global variable to store job ID
+        const isAuthenticated = {{ current_user.is_authenticated | tojson }}; // Pass auth status to JS
+        const uploadForm = document.getElementById('upload-form');
+        const submitButton = document.getElementById('submit-button');
+        const spinner = submitButton.querySelector('.spinner');
+        const fileInput = document.getElementById('video_file');
+        const fileNameDisplay = document.getElementById('file-name');
+        const uploadArea = document.querySelector('.upload-area');
+        const globalStatsDiv = document.getElementById('global-stats');
+        const queuedCountSpan = document.getElementById('queued-count');
+        const processingCountSpan = document.getElementById('processing-count');
+        const workerCountSpan = document.getElementById('worker-count');
+
+        const downloadLinkArea = document.getElementById('download-link-area');
+        const downloadLinkPlaceholder = document.getElementById('download-link-placeholder');
+
+        const sidebar = document.getElementById('sidebar');
+        const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+        const processingPopup = document.getElementById('processing-popup'); // Declare processing popup
+        const processingOverlay = document.getElementById('processing-overlay'); // New: Declare processing overlay
+
+        function truncateFileName(fileName, maxLength = 30) {
+            if (fileName.length <= maxLength) {
+                return fileName;
+            }
+            const extensionIndex = fileName.lastIndexOf('.');
+            let nameWithoutExtension = fileName;
+            let extension = '';
+
+            if (extensionIndex > -1) {
+                nameWithoutExtension = fileName.substring(0, extensionIndex);
+                extension = fileName.substring(extensionIndex);
+            }
+
+            const charsToShow = maxLength - extension.length - 3; // 3 for "..."
+            if (charsToShow <= 0) { // If extension is too long or maxLength is too small, just truncate from start
+                return fileName.substring(0, maxLength - 3) + '...';
+            }
+
+            const start = nameWithoutExtension.substring(0, Math.floor(charsToShow / 2));
+            const end = nameWithoutExtension.substring(nameWithoutExtension.length - Math.ceil(charsToShow / 2));
+            return `${start}...${end}${extension}`;
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const originalFileName = this.files[0].name;
+                fileNameDisplay.textContent = `Selected: ${truncateFileName(originalFileName, 30)}`; // Use a reasonable max length
+            } else {
+                fileNameDisplay.innerHTML = `Drag & Drop or <strong class="text-black">click to browse</strong>`;
+            }
+        });
+
+        mobileSidebarToggle.addEventListener('click', () => {
+            document.body.classList.toggle('sidebar-open');
+            document.body.classList.toggle('sidebar-closed');
+            mobileSidebarToggle.classList.toggle('active'); /* Toggle active class for hamburger animation */
+        });
+
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            if (!isAuthenticated) { // New authentication check
+                alert("Please sign up or sign in to process videos."); // Simple alert for now
+                window.location.href = "{{ url_for('register') }}"; // Redirect to register page
+                return; // Stop further execution
+            }
+
+            submitButton.disabled = true;
+            spinner.classList.remove('hidden');
+            submitButton.querySelector('span').lastChild.textContent = ' Processing...'; // Update button text
+            processingPopup.classList.remove('hidden'); // Show processing popup
+            processingOverlay.classList.remove('hidden'); // Show processing overlay
+            globalStatsDiv.style.display = 'none'; // Also hide global stats during processing
+            downloadLinkArea.classList.add('hidden'); // Hide download link area on new submission
+
+            const formData = new FormData(uploadForm);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) { // Check if HTTP status code is not 2xx
+                    let errorMessage = 'Server error';
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) { // Use .includes for robustness
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } else {
+                        // This handles cases where server returns non-JSON (e.g., HTML error page from proxy or app server)
+                        errorMessage = `Server responded with status ${response.status} ${response.statusText}.`;
+                        if (response.status === 403) { // Our specific 403 from backend
+                            errorMessage = 'Daily upload limit reached. Upgrade or try again tomorrow.';
+                        } else if (response.status >= 500) {
+                            errorMessage = 'Internal server error. Please try again later.';
+                        }
+                    }
+                    throw new Error(errorMessage); // Throw to be caught by the outer catch
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    current_job_id_to_poll = data.job_id; // Store job ID
+                    // The fetchQueueStats interval will now pick this up
+                } else {
+                    // This 'else' block handles cases where status is not 'success' but HTTP is 2xx
+                    hideProcessingOverlayAndPopup();
+                    downloadLinkPlaceholder.innerHTML = `<span>Upload failed: ${data.message || 'Unknown error'}</span>`;
+                    downloadLinkArea.classList.remove('hidden');
+                }
+            } catch (error) { // Catches network errors or the error thrown above
+                console.error('Error during file upload:', error);
+                hideProcessingOverlayAndPopup();
+
+                downloadLinkArea.classList.remove('bg-green-100', 'border-green-400', 'text-green-700');
+                downloadLinkArea.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+
+                downloadLinkPlaceholder.innerHTML = `<span>Upload failed: ${error.message || 'Network error during upload.'}</span>`;
+                downloadLinkArea.classList.remove('hidden');
+            }
+        });
+
+                async function fetchQueueStats() {
+                    // Fetch global queue stats
+                    try {
+                        const response = await fetch('/api/queue_stats');
+                        const data = await response.json();
+                        queuedCountSpan.textContent = data.queued_jobs; // Note: endpoint returns queued_jobs
+                        processingCountSpan.textContent = data.started_jobs; // Note: endpoint returns started_jobs
+                        workerCountSpan.textContent = data.total_workers; // Note: endpoint returns total_workers
+                        globalStatsDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error('Error fetching global queue stats:', error);
+                    }
+        
+                    // Fetch specific job status if a job is being polled
+                    if (current_job_id_to_poll) {
+                        try {
+                            const jobResponse = await fetch(`/api/job_status/${current_job_id_to_poll}`);
+                            const jobData = await jobResponse.json();
+        
+                                                                    if (jobData.status === 'transcribed') {
+                                                                        hideProcessingOverlayAndPopup();
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+                                                                        window.location.href = jobData.redirect_url; // Redirect to editor page
+                                                                    } else if (jobData.status === 'completed') {
+        
+                                                                        downloadLinkArea.classList.remove('bg-red-100', 'border-red-400', 'text-red-700'); // Remove error styles
+        
+                                                                        downloadLinkArea.classList.add('bg-green-100', 'border-green-400', 'text-green-700'); // Add success styles
+        
+                                                
+        
+                                                                        let downloadLinksHtml = '<strong>Video Processed!</strong><br>';
+        
+                                                                        if (jobData.result && jobData.result.video_url) {
+        
+                                                                            downloadLinksHtml += `<a href="${jobData.result.video_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download Video</a>`;
+        
+                                                                        }
+        
+                                                                        if (jobData.result && jobData.result.srt_url) {
+        
+                                                                            downloadLinksHtml += `<br><a href="${jobData.result.srt_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download SRT</a>`;
+        
+                                                                        }
+        
+                                                
+        
+                                                                        if (jobData.result && (jobData.result.video_url || jobData.result.srt_url)) {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = downloadLinksHtml;
+        
+                                                                            downloadLinkArea.classList.remove('hidden'); // Show download link area
+        
+                                                                        } else {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = `<strong>Video Processed!</strong><br><span>Completed, but no download links provided.</span>`;
+        
+                                                                            downloadLinkArea.classList.remove('hidden');
+        
+                                                                        }
+        
+                                                                        hideProcessingOverlayAndPopup();
+        
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+        
+                                                                    } else if (jobData.status === 'failed') {
+                                downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Video processing failed: ${jobData.error || jobData.progress_message || 'Unknown error'}. Please try again.</span>`;
+                                downloadLinkArea.classList.remove('hidden'); // Show error message
+                                hideProcessingOverlayAndPopup();
+                                current_job_id_to_poll = null; // Stop polling this job
+                            } else {
+                                // Job is still in progress ('queued', 'started', etc.)
+                                // Ensure popup and overlay are visible if polling started after page load
+                                if (processingPopup.classList.contains('hidden')) {
+                                    processingPopup.classList.remove('hidden');
+                                    processingOverlay.classList.remove('hidden');
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching job status for ${current_job_id_to_poll}:`, error);
+                            downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Error fetching job status.</span>`;
+                            downloadLinkArea.classList.remove('hidden');
+                            hideProcessingOverlayAndPopup();
+                            current_job_id_to_poll = null; // Stop polling on error
+                        }
+                    }
+                }
+        // Initial call for queue stats and set interval
+        fetchQueueStats(); // <--- Now fetchQueueStats is defined
+        setInterval(fetchQueueStats, 5000);
+
+        function hideProcessingOverlayAndPopup() {
+            processingPopup.classList.add('hidden');
+            processingOverlay.classList.add('hidden');
+            submitButton.disabled = false;
+            spinner.classList.add('hidden');
+            submitButton.querySelector('span').lastChild.textContent = ' Process Video';
+            // Removed: jobStatusAreaDiv.style.display = 'block';
+            globalStatsDiv.style.display = 'block'; // Keep global stats visible
+        }
+    </script>
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+    </script>
+</body>
+</html>

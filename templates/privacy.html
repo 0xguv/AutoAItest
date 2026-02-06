@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Auto Caption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='modern.css') }}">
+</head>
+<body class="bg-gray-50 flex flex-col items-center justify-center min-h-screen p-10">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-3xl font-bold text-gray-900 mb-4">Privacy Policy</h1>
+        <p class="text-gray-700 mb-4">
+            At Auto Caption, we are committed to protecting your privacy. This Privacy Policy explains how we collect,
+            use, and disclose information about you.
+        </p>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-3">1. Information We Collect</h2>
+        <p class="text-gray-700 mb-4">
+            We collect information you provide directly to us, such as your email address when you register. We also
+            collect usage data related to your interaction with our service.
+        </p>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-3">2. How We Use Your Information</h2>
+        <p class="text-gray-700 mb-4">
+            We use the information we collect to provide, maintain, and improve our services, to develop new services,
+            and to protect Auto Caption and our users.
+        </p>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-3">3. Sharing of Information</h2>
+        <p class="text-gray-700 mb-4">
+            We do not share your personal information with third parties except as necessary to provide our services
+            or as required by law.
+        </p>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-3">4. Data Security</h2>
+        <p class="text-gray-700 mb-4">
+            We implement reasonable measures to protect your information from unauthorized access, alteration, or destruction.
+        </p>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-3">5. Your Choices</h2>
+        <p class="text-gray-700 mb-4">
+            You may review, update, or delete your account information by contacting us directly.
+        </p>
+        <a href="{{ url_for('register') }}" class="text-blue-600 hover:underline">Back to Registration</a>
+    </div>
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+    </script>
+</body>
+</html>

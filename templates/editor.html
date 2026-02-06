@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Subtitles - Auto Caption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+            background-color: black;
+        }
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .subtitle-overlay {
+            position: absolute;
+            bottom: 10%; /* Adjust as needed */
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 1.5rem;
+            text-align: center;
+            pointer-events: none; /* Allows clicks to pass through to video controls */
+            user-select: none;
+        }
+        .subtitle-editable-area {
+            max-height: 400px; /* Or whatever height fits your design */
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            background-color: white;
+            color: black;
+            border-radius: 5px;
+        }
+        .subtitle-line {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            position: relative; /* For drag handle if implemented */
+        }
+        .subtitle-line:hover {
+            background-color: #f0f0f0;
+        }
+        .subtitle-line.active {
+            background-color: #e0e7ff; /* Highlight active line */
+        }
+        .subtitle-line textarea {
+            width: 100%;
+            border: none;
+            background-color: transparent;
+            resize: vertical;
+            padding: 0;
+            margin: 0;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: black; /* Ensure text is visible */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+    <div class="max-w-4xl w-full mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Edit Subtitles for {{ original_filename }}</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <div class="
+                        {% if category == 'success' %} bg-green-100 border-green-400 text-green-700
+                        {% elif category == 'error' %} bg-red-100 border-red-400 text-red-700
+                        {% elif category == 'info' %} bg-blue-100 border-blue-400 text-blue-700
+                        {% else %} bg-gray-100 border-gray-400 text-gray-700
+                        {% endif %}
+                        px-3 py-2 rounded relative mb-3 text-sm" role="alert">
+                        <strong class="font-bold">{{ category.capitalize() }}:</strong>
+                        <span class="block sm:inline">{{ msg }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <div class="video-container rounded-lg overflow-hidden mb-4">
+                    <video id="video-player" controls preload="metadata">
+                        <source src="{{ video_url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div id="subtitle-display" class="subtitle-overlay hidden"></div>
+                </div>
+                <button id="save-burn-button" class="w-full bg-blue-600 text-white font-medium py-2 rounded-md hover:bg-blue-700 transition text-sm">
+                    <span class="flex items-center justify-center">
+                        <span class="spinner hidden"></span> Save & Burn Subtitles
+                    </span>
+                </button>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Subtitle Text</h2>
+                <div id="subtitle-editable-area" class="subtitle-editable-area">
+                    <!-- Subtitle lines will be injected here by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const videoPlayer = document.getElementById('video-player');
+        const subtitleDisplay = document.getElementById('subtitle-display');
+        const subtitleEditableArea = document.getElementById('subtitle-editable-area');
+        const saveBurnButton = document.getElementById('save-burn-button');
+        const spinner = saveBurnButton.querySelector('.spinner');
+
+        let subtitles = []; // Array to hold subtitle objects { index, start, end, text, originalText, position }
+        let currentSubtitleIndex = -1;
+        const job_id = "{{ job_id }}";
+        const resolution = "{{ resolution }}"; // Passed from Flask for burning
+        const language = "{{ language }}"; // Passed from Flask for burning
+
+        // Function to parse SRT content
+        function parseSrt(srtContent) {
+            const lines = srtContent.trim().split(/?
+/);
+            let current = {};
+            let srtArray = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+
+                if (line === '') {
+                    if (Object.keys(current).length > 0) {
+                        srtArray.push(current);
+                        current = {};
+                    }
+                } else if (!isNaN(parseInt(line)) && !current.index) {
+                    current.index = parseInt(line);
+                } else if (line.includes('-->')) {
+                    const [start, end] = line.split('-->').map(time => {
+                        const parts = time.trim().replace(',', '.').split(':');
+                        const hours = parseFloat(parts[0]);
+                        const minutes = parseFloat(parts[1]);
+                        const seconds = parseFloat(parts[2]);
+                        return (hours * 3600) + (minutes * 60) + seconds;
+                    });
+                    current.start = start;
+                    current.end = end;
+                } else if (current.index && current.start !== undefined && current.end !== undefined) {
+                    current.text = (current.text ? current.text + '
+' : '') + line;
+                }
+            }
+            if (Object.keys(current).length > 0) {
+                srtArray.push(current);
+            }
+            return srtArray.map((sub, idx) => ({
+                id: `sub-${idx}`, // Unique ID for DOM element
+                index: sub.index,
+                start: sub.start,
+                end: sub.end,
+                text: sub.text.replace(/<[^>]*>?/gm, ''), // Strip HTML tags
+                originalText: sub.text.replace(/<[^>]*>?/gm, ''),
+                position: { x: 50, y: 10 } // Default position (50% from left, 10% from bottom, for example)
+            }));
+        }
+
+        // Function to format time for SRT
+        function formatSrtTime(seconds) {
+            const date = new Date(0);
+            date.setMilliseconds(seconds * 1000);
+            const hours = date.getUTCHours().toString().padStart(2, '0');
+            const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+            const secs = date.getUTCSeconds().toString().padStart(2, '0');
+            const millis = Math.floor((seconds - Math.floor(seconds)) * 1000).toString().padStart(3, '0');
+            return `${hours}:${minutes}:${secs},${millis}`;
+        }
+
+        // Function to generate SRT content from subtitles array
+        function generateSrtContent() {
+            let srt = '';
+            subtitles.forEach(sub => {
+                srt += `${sub.index}
+`;
+                srt += `${formatSrtTime(sub.start)} --> ${formatSrtTime(sub.end)}
+`;
+                srt += `${sub.text}
+
+`;
+            });
+            return srt;
+        }
+
+        // Load subtitles from Flask-provided content
+        function loadSubtitles() {
+            const srtContent = {{ srt_content | tojson }}; // Escaped SRT content
+            subtitles = parseSrt(srtContent);
+            renderEditableSubtitles();
+        }
+
+        // Render subtitles in the editable area
+        function renderEditableSubtitles() {
+            subtitleEditableArea.innerHTML = '';
+            subtitles.forEach((sub, idx) => {
+                const div = document.createElement('div');
+                div.className = 'subtitle-line text-sm';
+                div.dataset.index = idx;
+                div.innerHTML = `<span class="font-bold text-gray-600 mr-2">${idx + 1}.</span>
+                                 <span class="text-gray-500 mr-2">${formatSrtTime(sub.start).split(',')[0]} - ${formatSrtTime(sub.end).split(',')[0]}</span>
+                                 <textarea class="mt-1" rows="${sub.text.split('
+').length}" data-original-rows="${sub.text.split('
+').length}">${sub.text}</textarea>`;
+                
+                const textarea = div.querySelector('textarea');
+                textarea.addEventListener('input', (e) => {
+                    subtitles[idx].text = e.target.value;
+                    e.target.rows = e.target.value.split('
+').length || e.target.dataset.originalRows; // Adjust rows dynamically
+                });
+                textarea.addEventListener('focus', () => {
+                    highlightSubtitleLine(idx);
+                });
+                textarea.addEventListener('blur', () => {
+                    // Optionally remove highlight if not active on video
+                });
+
+                div.addEventListener('click', () => {
+                    videoPlayer.currentTime = sub.start;
+                    highlightSubtitleLine(idx);
+                });
+
+                subtitleEditableArea.appendChild(div);
+            });
+        }
+
+        function highlightSubtitleLine(index) {
+            if (currentSubtitleIndex !== -1) {
+                const prev = subtitleEditableArea.querySelector(`.subtitle-line[data-index="${currentSubtitleIndex}"]`);
+                if (prev) prev.classList.remove('active');
+            }
+            const current = subtitleEditableArea.querySelector(`.subtitle-line[data-index="${index}"]`);
+            if (current) {
+                current.classList.add('active');
+                current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            currentSubtitleIndex = index;
+        }
+
+        // Update displayed subtitle based on video time
+        videoPlayer.addEventListener('timeupdate', () => {
+            const currentTime = videoPlayer.currentTime;
+            let activeSubtitle = null;
+
+            for (let i = 0; i < subtitles.length; i++) {
+                if (currentTime >= subtitles[i].start && currentTime < subtitles[i].end) {
+                    activeSubtitle = subtitles[i];
+                    highlightSubtitleLine(i);
+                    break;
+                }
+            }
+
+            if (activeSubtitle) {
+                subtitleDisplay.textContent = activeSubtitle.text;
+                subtitleDisplay.style.left = `${activeSubtitle.position.x}%`;
+                subtitleDisplay.style.bottom = `${activeSubtitle.position.y}%`;
+                subtitleDisplay.classList.remove('hidden');
+            } else {
+                subtitleDisplay.classList.add('hidden');
+                if (currentSubtitleIndex !== -1) {
+                    const prev = subtitleEditableArea.querySelector(`.subtitle-line[data-index="${currentSubtitleIndex}"]`);
+                    if (prev) prev.classList.remove('active');
+                    currentSubtitleIndex = -1;
+                }
+            }
+        });
+
+        // Positional editing (drag and drop) - Basic implementation
+        let isDragging = false;
+        let startX, startY, startBottom, startLeft;
+
+        subtitleDisplay.addEventListener('mousedown', (e) => {
+            if (e.button !== 0 || subtitleDisplay.classList.contains('hidden')) return; // Only left click and visible
+            isDragging = true;
+            subtitleDisplay.style.pointerEvents = 'auto'; // Make it draggable
+
+            startX = e.clientX;
+            startY = e.clientY;
+            startBottom = parseFloat(subtitleDisplay.style.bottom);
+            startLeft = parseFloat(subtitleDisplay.style.left);
+
+            subtitleDisplay.style.cursor = 'grabbing';
+            // Prevent text selection during drag
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+
+            // Calculate new position in percentage relative to videoPlayer size
+            const videoRect = videoPlayer.getBoundingClientRect();
+            const newLeft = startLeft + (deltaX / videoRect.width) * 100;
+            const newBottom = startBottom - (deltaY / videoRect.height) * 100; // Invert deltaY for bottom
+
+            // Clamp values to stay within bounds
+            const clampedLeft = Math.max(0, Math.min(100, newLeft));
+            const clampedBottom = Math.max(0, Math.min(100, newBottom));
+
+            subtitleDisplay.style.left = `${clampedLeft}%`;
+            subtitleDisplay.style.bottom = `${clampedBottom}%`;
+
+            // Update current active subtitle's position data
+            if (currentSubtitleIndex !== -1) {
+                subtitles[currentSubtitleIndex].position.x = clampedLeft;
+                subtitles[currentSubtitleIndex].position.y = clampedBottom;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                subtitleDisplay.style.cursor = 'grab';
+                subtitleDisplay.style.pointerEvents = 'none'; // Restore to allow video interaction
+            }
+        });
+
+        subtitleDisplay.style.cursor = 'grab'; // Initial cursor style
+
+        // Save & Burn button click handler
+        saveBurnButton.addEventListener('click', async () => {
+            saveBurnButton.disabled = true;
+            spinner.classList.remove('hidden');
+            saveBurnButton.querySelector('span').lastChild.textContent = ' Burning...';
+
+            const editedSrtContent = generateSrtContent();
+            
+            // Collect positional data
+            const positionalData = subtitles.map(sub => ({
+                index: sub.index,
+                x: sub.position.x,
+                y: sub.position.y
+            }));
+
+            try {
+                const response = await fetch('/save_and_burn', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        job_id: job_id,
+                        srt_content: editedSrtContent,
+                        positional_data: positionalData,
+                        resolution: resolution, // Pass resolution for burning
+                        language: language // Pass language (optional, for burning only if needed)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Redirect to a status page or display success message
+                    window.location.href = `/?message=${encodeURIComponent('Subtitles saved and burning started!')}&job_id=${data.job_id}`;
+                } else {
+                    alert('Error saving and burning subtitles: ' + (data.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error during save and burn:', error);
+                alert('An error occurred during save and burn operation.');
+            } finally {
+                saveBurnButton.disabled = false;
+                spinner.classList.add('hidden');
+                saveBurnButton.querySelector('span').lastChild.textContent = ' Save & Burn Subtitles';
+            }
+        });
+
+        // Initialize
+        loadSubtitles();
+        // Set initial video player time for testing or first subtitle
+        if (subtitles.length > 0) {
+            videoPlayer.currentTime = subtitles[0].start;
+        }
+    </script>
+</body>
+</html>

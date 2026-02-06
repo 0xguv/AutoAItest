@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - Auto Caption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='modern.css') }}">
+</head>
+<body class="bg-gray-50 flex sidebar-closed">
+    {% if current_user.is_authenticated %}
+    <button class="mobile-sidebar-toggle fixed top-4 left-4 z-50 p-2 rounded-md bg-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-black" id="mobile-sidebar-toggle">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    {% endif %}
+    {% if not current_user.is_authenticated %}
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+        <a href="{{ url_for('login') }}" class="btn btn-primary text-sm px-3 py-1.5">Sign In</a>
+        <a href="{{ url_for('register') }}" class="btn text-sm px-3 py-1.5">Sign Up</a>
+    </div>
+    {% endif %}
+
+    {% if current_user.is_authenticated %}
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+        </div>
+        <div class="sidebar-nav">
+            <a href="{{ url_for('index') }}" class="nav-item">
+                <i class="fas fa-home"></i><span>Dashboard</span>
+            </a>
+            <div class="nav-item">
+                <i class="fas fa-coins"></i><span><span class="nav-stat">{% if current_user.max_daily_tries == -1 %}∞{% else %}{{ current_user.max_daily_tries - current_user.daily_tries_count }} Tokens{% endif %}</span></span>
+            </div>
+            <div class="nav-item">
+                <i class="fas fa-clock"></i><span><span class="nav-stat">{{ current_user.max_duration_minutes }} Minutes</span></span>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('profile') }}" class="nav-item active">
+                <i class="fas fa-user"></i><span>Profile</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="nav-item">
+                <i class="fas fa-sign-out-alt"></i><span>Logout</span>
+            </a>
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="content-area flex-1 flex flex-col justify-center p-4 sm:p-6 pt-[64px]">
+        <div class="max-w-3xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-md">
+
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Account Details</h3>
+                    <dl class="text-gray-600 text-sm">
+                        <dt class="font-medium text-gray-800">Username</dt>
+                        <dd class="mb-2">{{ current_user.username }}</dd>
+                        <dt class="font-medium text-gray-800">Email</dt>
+                        <dd class="mb-2">{{ current_user.email }}</dd>
+                        <dt class="font-medium text-gray-800">Subscription</dt>
+                        <dd class="mb-2">
+                            {% if current_user.is_subscribed %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Subscribed</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Free</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Usage Limits</h3>
+                    <dl class="text-gray-600 text-sm">
+                        <dt class="font-medium text-gray-800">Daily Tokens</dt>
+                        <dd class="mb-2">{% if current_user.max_daily_tries == -1 %}Unlimited{% else %}{{ current_user.max_daily_tries }} Tokens{% endif %}</dd>
+                        <dt class="font-medium text-gray-800">Duration</dt>
+                        <dd class="mb-2">{{ current_user.max_duration_minutes }} Minutes</dd>
+                        <dt class="font-medium text-gray-800">Last Upload</dt>
+                        <dd class="mb-2">{% if current_user.last_try_date.year == 1 %}Never{% else %}{{ current_user.last_try_date.strftime('%b %d, %Y') }}{% endif %}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 shadow-sm mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Daily Usage</h3>
+                <div class="h-48">
+                    <canvas id="usageChart"></canvas>
+                </div>
+            </div>
+            
+
+        </div>
+    </div>
+
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const mobileSidebarToggle = document.getElementById('mobile-sidebar-toggle');
+
+        mobileSidebarToggle.addEventListener('click', () => {
+            document.body.classList.toggle('sidebar-open');
+            document.body.classList.toggle('sidebar-closed');
+            mobileSidebarToggle.classList.toggle('active'); /* Toggle active class for hamburger animation */
+        });
+
+        fetch('/api/user_usage')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('usageChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.dates,
+                        datasets: [{
+                            label: 'Videos Processed',
+                            data: data.videos_processed,
+                            backgroundColor: '#10B981', // Accent green
+                            borderColor: '#059669', // Darker green
+                            borderWidth: 1,
+                            borderRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: '#4B5563', // Dark text for light theme
+                                    font: { family: 'Inter, sans-serif' }
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#E5E7EB' }, // Light grid lines
+                                ticks: {
+                                    color: '#4B5563', // Dark text for light theme
+                                    font: { family: 'Inter, sans-serif' }
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('Error fetching usage data:', error));
+    </script>
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+    </script>
+</body>
+</html>
