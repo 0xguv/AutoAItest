@@ -4,6 +4,7 @@
 
 {% block content %}
     <div id="auth-status" data-is-authenticated="{{ current_user.is_authenticated | tojson }}" style="display:none;"></div>
+    <div id="register-url-data" data-register-url="{{ url_for('register') }}" style="display:none;"></div>
     <div class="max-w-3xl mx-auto bg-white p-4 sm:p-6 rounded-lg shadow-md">
         <h1 class="text-2xl font-bold text-gray-900 mb-1">Auto Caption</h1>
         <p class="text-sm text-gray-600 mb-4">Generate subtitles for your videos quickly and easily.</p>
@@ -70,6 +71,225 @@
 
 {% block scripts %}
     <script>
-        console.log("Index page script loaded successfully (minimal version)!");
+        // Custom JS to toggle spinner, etc.
+        let current_job_id_to_poll = null; // New global variable to store job ID
+        const authStatusDiv = document.getElementById('auth-status');
+        const isAuthenticated = authStatusDiv ? JSON.parse(authStatusDiv.dataset.isAuthenticated) : false; // Read from data attribute
+        const uploadForm = document.getElementById('upload-form');
+        const submitButton = document.getElementById('submit-button');
+        const spinner = submitButton.querySelector('.spinner');
+        const fileInput = document.getElementById('video_file');
+        const fileNameDisplay = document.getElementById('file-name');
+        const uploadArea = document.querySelector('.upload-area');
+        const globalStatsDiv = document.getElementById('global-stats');
+        const queuedCountSpan = document.getElementById('queued-count');
+        const processingCountSpan = document.getElementById('processing-count');
+        const workerCountSpan = document.getElementById('worker-count');
+
+        const downloadLinkArea = document.getElementById('download-link-area');
+        const downloadLinkPlaceholder = document.getElementById('download-link-placeholder');
+
+        const processingPopup = document.getElementById('processing-popup');
+        const processingOverlay = document.getElementById('processing-overlay');
+
+
+        function truncateFileName(fileName, maxLength = 30) {
+            if (fileName.length <= maxLength) {
+                return fileName;
+            }
+            const extensionIndex = fileName.lastIndexOf('.');
+            let nameWithoutExtension = fileName;
+            let extension = '';
+
+            if (extensionIndex > -1) {
+                nameWithoutExtension = fileName.substring(0, extensionIndex);
+                extension = fileName.substring(extensionIndex);
+            }
+
+            const charsToShow = maxLength - extension.length - 3; // 3 for "..."
+            if (charsToShow <= 0) { // If extension is too long or maxLength is too small, just truncate from start
+                return fileName.substring(0, maxLength - 3) + '...';
+            }
+
+            const start = nameWithoutExtension.substring(0, Math.floor(charsToShow / 2));
+            const end = nameWithoutExtension.substring(nameWithoutExtension.length - Math.ceil(charsToShow / 2));
+            return `${start}...${end}${extension}`;
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const originalFileName = this.files[0].name;
+                fileNameDisplay.textContent = `Selected: ${truncateFileName(originalFileName, 30)}`; // Use a reasonable max length
+            } else {
+                fileNameDisplay.innerHTML = `Drag & Drop or <strong class="text-black">click to browse</strong>`;
+            }
+        });
+
+        uploadForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            if (!isAuthenticated) { // New authentication check
+                alert("Please sign up or sign in to process videos."); // Simple alert for now
+                const registerUrlDiv = document.getElementById('register-url-data');
+                window.location.href = registerUrlDiv ? registerUrlDiv.dataset.registerUrl : "{{ url_for('register') }}"; // Fallback just in case
+                return; // Stop further execution
+            }
+
+            submitButton.disabled = true;
+            spinner.classList.remove('hidden');
+            submitButton.querySelector('span').lastChild.textContent = ' Processing...'; // Update button text
+            processingPopup.classList.remove('hidden'); // Show processing popup
+            processingOverlay.classList.remove('hidden'); // Show processing overlay
+            globalStatsDiv.style.display = 'none'; // Also hide global stats during processing
+            downloadLinkArea.classList.add('hidden'); // Hide download link area on new submission
+
+            const formData = new FormData(uploadForm);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) { // Check if HTTP status code is not 2xx
+                    let errorMessage = 'Server error';
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) { // Use .includes for robustness
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } else {
+                        // This handles cases where server returns non-JSON (e.g., HTML error page from proxy or app server)
+                        errorMessage = `Server responded with status ${response.status} ${response.statusText}.`;
+                        if (response.status === 403) { // Our specific 403 from backend
+                            errorMessage = 'Daily upload limit reached. Upgrade or try again tomorrow.';
+                        } else if (response.status >= 500) {
+                            errorMessage = 'Internal server error. Please try again later.';
+                        }
+                    }
+                    throw new Error(errorMessage); // Throw to be caught by the outer catch
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    current_job_id_to_poll = data.job_id; // Store job ID
+                    // The fetchQueueStats interval will now pick this up
+                } else {
+                    // This 'else' block handles cases where status is not 'success' but HTTP is 2xx
+                    hideProcessingOverlayAndPopup();
+                    downloadLinkPlaceholder.innerHTML = `<span>Upload failed: ${data.message || 'Unknown error'}</span>`;
+                    downloadLinkArea.classList.remove('hidden');
+                }
+            } catch (error) { // Catches network errors or the error thrown above
+                console.error('Error during file upload:', error);
+                hideProcessingOverlayAndPopup();
+
+                downloadLinkArea.classList.remove('bg-green-100', 'border-green-400', 'text-green-700');
+                downloadLinkArea.classList.add('bg-red-100', 'border-red-400', 'text-red-700');
+
+                downloadLinkPlaceholder.innerHTML = `<span>Upload failed: ${error.message || 'Network error during upload.'}</span>`;
+                downloadLinkArea.classList.remove('hidden');
+            }
+        });
+
+                async function fetchQueueStats() {
+                    // Fetch global queue stats
+                    try {
+                        const response = await fetch('/api/queue_stats');
+                        const data = await response.json();
+                        queuedCountSpan.textContent = data.queued_jobs; // Note: endpoint returns queued_jobs
+                        processingCountSpan.textContent = data.started_jobs; // Note: endpoint returns started_jobs
+                        workerCountSpan.textContent = data.total_workers; // Note: endpoint returns total_workers
+                        globalStatsDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error('Error fetching global queue stats:', error);
+                    }
+        
+                    // Fetch specific job status if a job is being polled
+                    if (current_job_id_to_poll) {
+                        try {
+                            const jobResponse = await fetch(`/api/job_status/${current_job_id_to_poll}`);
+                            const jobData = await jobResponse.json();
+        
+                                                                    if (jobData.status === 'transcribed') {
+                                                                        hideProcessingOverlayAndPopup();
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+                                                                        window.location.href = jobData.redirect_url; // Redirect to editor page
+                                                                    } else if (jobData.status === 'completed') {
+        
+                                                                        downloadLinkArea.classList.remove('bg-red-100', 'border-red-400', 'text-red-700'); // Remove error styles
+        
+                                                                        downloadLinkArea.classList.add('bg-green-100', 'border-green-400', 'text-green-700'); // Add success styles
+        
+                                                
+        
+                                                                        let downloadLinksHtml = '<strong>Video Processed!</strong><br>';
+        
+                                                                        if (jobData.result && jobData.result.video_url) {
+        
+                                                                            downloadLinksHtml += `<a href="${jobData.result.video_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download Video</a>`;
+        
+                                                                        }
+        
+                                                                        if (jobData.result && jobData.result.srt_url) {
+        
+                                                                            downloadLinksHtml += `<br><a href="${jobData.result.srt_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download SRT</a>`;
+        
+                                                                        }
+        
+                                                
+        
+                                                                        if (jobData.result && (jobData.result.video_url || jobData.result.srt_url)) {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = downloadLinksHtml;
+        
+                                                                            downloadLinkArea.classList.remove('hidden'); // Show download link area
+        
+                                                                        } else {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = `<strong>Video Processed!</strong><br><span>Completed, but no download links provided.</span>`;
+        
+                                                                            downloadLinkArea.classList.remove('hidden');
+        
+                                                                        }
+        
+                                                                        hideProcessingOverlayAndPopup();
+        
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+        
+                                                                    } else if (jobData.status === 'failed') {
+                                downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Video processing failed: ${jobData.error || jobData.progress_message || 'Unknown error'}. Please try again.</span>`;
+                                downloadLinkArea.classList.remove('hidden'); // Show error message
+                                hideProcessingOverlayAndPopup();
+                                current_job_id_to_poll = null; // Stop polling this job
+                            } else {
+                                // Job is still in progress ('queued', 'started', etc.)
+                                // Ensure popup and overlay are visible if polling started after page load
+                                if (processingPopup.classList.contains('hidden')) {
+                                    processingPopup.classList.remove('hidden');
+                                    processingOverlay.classList.remove('hidden');
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching job status for ${current_job_id_to_poll}:`, error);
+                            downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Error fetching job status.</span>`;
+                            downloadLinkArea.classList.remove('hidden');
+                            hideProcessingOverlayAndPopup();
+                            current_job_id_to_poll = null; // Stop polling on error
+                        }
+                    }
+                }
+        // Initial call for queue stats and set interval
+        fetchQueueStats(); // <--- Now fetchQueueStats is defined
+        setInterval(fetchQueueStats, 5000);
+
+        function hideProcessingOverlayAndPopup() {
+            processingPopup.classList.add('hidden');
+            processingOverlay.classList.add('hidden');
+            submitButton.disabled = false;
+            spinner.classList.add('hidden');
+            submitButton.querySelector('span').lastChild.textContent = ' Process Video';
+            // Removed: jobStatusAreaDiv.style.display = 'block';
+            globalStatsDiv.style.display = 'block'; // Keep global stats visible
+        }
     </script>
-{% endblock %}
