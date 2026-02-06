@@ -191,6 +191,134 @@
             }
         });
 
+        // Drag and drop functionality
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadArea.classList.add('border-blue-500'); // Example highlight class
+        }
+
+        function unhighlight(e) {
+            uploadArea.classList.remove('border-blue-500'); // Example highlight class
+        }
+
+        uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+
+            if (files.length > 0) {
+                fileInput.files = files; // Assign dropped files to the input
+                // Manually trigger change event for consistency with click selection
+                const event = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(event);
+            }
+        }
+
+                async function fetchQueueStats() {
+                    // Fetch global queue stats
+                    try {
+                        const response = await fetch('/api/queue_stats');
+                        const data = await response.json();
+                        queuedCountSpan.textContent = data.queued_jobs; // Note: endpoint returns queued_jobs
+                        processingCountSpan.textContent = data.started_jobs; // Note: endpoint returns started_jobs
+                        workerCountSpan.textContent = data.total_workers; // Note: endpoint returns total_workers
+                        globalStatsDiv.style.display = 'block';
+                    } catch (error) {
+                        console.error('Error fetching global queue stats:', error);
+                    }
+        
+                    // Fetch specific job status if a job is being polled
+                    if (current_job_id_to_poll) {
+                        try {
+                            const jobResponse = await fetch(`/api/job_status/${current_job_id_to_poll}`);
+                            const jobData = await jobResponse.json();
+        
+                                                                    if (jobData.status === 'transcribed') {
+                                                                        hideProcessingOverlayAndPopup();
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+                                                                        window.location.href = jobData.redirect_url; // Redirect to editor page
+                                                                    } else if (jobData.status === 'completed') {
+        
+                                                                        downloadLinkArea.classList.remove('bg-red-100', 'border-red-400', 'text-red-700'); // Remove error styles
+        
+                                                                        downloadLinkArea.classList.add('bg-green-100', 'border-green-400', 'text-green-700'); // Add success styles
+        
+                                                
+        
+                                                                        let downloadLinksHtml = '<strong>Video Processed!</strong><br>';
+        
+                                                                        if (jobData.result && jobData.result.video_url) {
+        
+                                                                            downloadLinksHtml += `<a href="${jobData.result.video_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download Video</a>`;
+        
+                                                                        }
+        
+                                                                        if (jobData.result && jobData.result.srt_url) {
+        
+                                                                            downloadLinksHtml += `<br><a href="${jobData.result.srt_url}" class="text-blue-700 hover:text-blue-900 font-bold underline" download>Download SRT</a>`;
+        
+                                                                        }
+        
+                                                
+        
+                                                                        if (jobData.result && (jobData.result.video_url || jobData.result.srt_url)) {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = downloadLinksHtml;
+        
+                                                                            downloadLinkArea.classList.remove('hidden'); // Show download link area
+        
+                                                                        } else {
+        
+                                                                            downloadLinkPlaceholder.innerHTML = `<strong>Video Processed!</strong><br><span>Completed, but no download links provided.</span>`;
+        
+                                                                            downloadLinkArea.classList.remove('hidden');
+        
+                                                                        }
+        
+                                                                        hideProcessingOverlayAndPopup();
+        
+                                                                        current_job_id_to_poll = null; // Stop polling this job
+        
+                                                                    } else if (jobData.status === 'failed') {
+                                downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Video processing failed: ${jobData.error || jobData.progress_message || 'Unknown error'}. Please try again.</span>`;
+                                downloadLinkArea.classList.remove('hidden'); // Show error message
+                                hideProcessingOverlayAndPopup();
+                                current_job_id_to_poll = null; // Stop polling this job
+                            } else {
+                                // Job is still in progress ('queued', 'started', etc.)
+                                // Ensure popup and overlay are visible if polling started after page load
+                                if (processingPopup.classList.contains('hidden')) {
+                                    processingPopup.classList.remove('hidden');
+                                    processingOverlay.classList.remove('hidden');
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`Error fetching job status for ${current_job_id_to_poll}:`, error);
+                            downloadLinkPlaceholder.innerHTML = `<span class="text-red-700">Error fetching job status.</span>`;
+                            downloadLinkArea.classList.remove('hidden');
+                            hideProcessingOverlayAndPopup();
+                            current_job_id_to_poll = null; // Stop polling on error
+                        }
+                    }
+                }
+
                 async function fetchQueueStats() {
                     // Fetch global queue stats
                     try {
