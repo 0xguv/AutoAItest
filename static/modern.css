@@ -270,6 +270,16 @@ select.form-control {
     font-size: 0.85rem;
     margin-left: auto; /* Push to the right */
 }
+
+.sidebar-stats-item {
+    padding: 10px 15px; /* Consistent padding with nav items */
+    margin: 0 10px 10px 10px; /* Margin top 10, sides 10, bottom 10 */
+    border-radius: 8px;
+    background-color: var(--secondary-bg); /* Use secondary background for subtle contrast */
+    color: var(--text-medium);
+    font-size: 0.75rem; /* Small font size for stats */
+    border: 1px solid var(--border-light); /* Subtle border */
+}
 .content-area {
     margin-left: 180px; /* Adjust to new sidebar width */
     padding: 0;

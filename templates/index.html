@@ -57,14 +57,13 @@
             </button>
         </form>
 
-        <div class="status-sections mt-6">
-            <div id="global-stats" class="alert px-3 py-2 rounded relative mb-3 bg-blue-100 border-blue-400 text-blue-700 text-sm text-center" style="display: none;">
-                Queued: <span id="queued-count">0</span> | Processing: <span id="processing-count">0</span> | Workers: <span id="worker-count">0</span>
-            </div>
-            <div id="download-link-area" class="alert px-3 py-2 rounded relative mb-3 bg-green-100 border-green-400 text-green-700 text-sm text-center hidden">
-                <span id="download-link-placeholder"></span>
-            </div>
-        </div>
+{% block sidebar_stats %}
+    <div id="global-stats" class="sidebar-stats-item text-xs p-2 rounded relative mt-4 bg-gray-100 text-gray-700 flex flex-col space-y-1 hidden">
+        <div>Queued: <span id="queued-count">0</span></div>
+        <div>Processing: <span id="processing-count">0</span></div>
+        <div>Workers: <span id="worker-count">0</span></div>
+    </div>
+{% endblock %}
         
     </div>
 {% endblock %}
