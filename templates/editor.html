@@ -280,6 +280,103 @@
             height: auto;
             min-height: 400px;
         }
+        
+        .max-w-7xl {
+            max-width: 100%;
+        }
+    }
+    
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+        /* Adjust container for mobile sidebar */
+        .max-w-7xl {
+            margin-left: 0;
+            padding: 0 1rem;
+        }
+        
+        /* Stack video and editor vertically */
+        .editor-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        
+        /* Make editor sidebar shorter on mobile */
+        .editor-sidebar {
+            height: 400px;
+            min-height: 300px;
+        }
+        
+        /* Smaller padding on mobile */
+        .editor-header {
+            padding: 1rem;
+        }
+        
+        .px-6 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        /* Smaller text on mobile */
+        .editor-header h1 {
+            font-size: 1.25rem;
+        }
+        
+        .editor-header .filename {
+            font-size: 0.8rem;
+        }
+        
+        /* Smaller subtitle text areas */
+        .subtitle-line textarea {
+            min-height: 50px;
+            font-size: 0.9rem;
+        }
+        
+        /* Full width buttons on mobile */
+        .action-bar {
+            flex-direction: column;
+        }
+        
+        .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        /* Adjust popup for mobile */
+        #editor-processing-popup {
+            max-width: 90%;
+            padding: 1rem;
+        }
+    }
+    
+    /* Very small screens */
+    @media (max-width: 480px) {
+        .editor-sidebar {
+            height: 350px;
+        }
+        
+        .subtitle-line {
+            padding: 0.75rem;
+        }
+        
+        .sidebar-header {
+            padding: 0.75rem 1rem;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1rem;
+        }
+    }
+    
+    /* Handle sidebar open/closed states */
+    @media (max-width: 768px) {
+        body.sidebar-open .max-w-7xl {
+            margin-left: 0;
+        }
+        
+        body.sidebar-closed .max-w-7xl {
+            margin-left: 0;
+        }
     }
 
     /* Loading spinner */
@@ -313,7 +410,8 @@
 {% endblock %}
 
 {% block content %}
-    <div class="max-w-7xl mx-auto w-full bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="editor-container w-full px-4 sm:px-6 lg:px-8 py-4">
+        <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
         <!-- Header -->
         <div class="editor-header">
             <h1>Edit Subtitles</h1>
@@ -359,6 +457,7 @@
                     </button>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
