@@ -177,6 +177,14 @@ class UsageLog(db.Model):
         return f'<UsageLog {self.user.username} {self.date} - {self.videos_processed} videos>'
 
 
+# Auto-create database tables on startup (for Railway deployment)
+with app.app_context():
+    try:
+        db.create_all()
+        app.logger.info("Database tables created successfully (or already exist)")
+    except Exception as e:
+        app.logger.error(f"Error creating database tables: {e}")
+
 
 def seconds_to_srt_time(seconds):
     hours = int(seconds // 3600)
