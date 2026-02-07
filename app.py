@@ -15,7 +15,8 @@ from datetime import datetime, date
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER', 'uploads')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'a_very_secret_key_that_should_be_in_env') # Needed for Flask-Login
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///app.db')
+# Check for DATABASE_URL first, then DATABASE_PUBLIC_URL, then fall back to SQLite
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or os.environ.get('DATABASE_PUBLIC_URL') or 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Configuration for generating external URLs correctly in production
 app.config['SERVER_NAME'] = os.environ.get('FLASK_SERVER_NAME') # e.g., 'your-domain.railway.app'
