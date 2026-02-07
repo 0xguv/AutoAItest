@@ -841,6 +841,39 @@ def job_status(job_id):
             "progress_message": f"Job is currently {status_to_report}."
         })
 
+@app.route('/api/editor_data/<job_id>')
+@login_required
+def get_editor_data(job_id):
+    job_entry = VideoProcessingJob.query.filter_by(id=job_id, user_id=current_user.id).first()
+
+    if not job_entry:
+        return jsonify({"status": "error", "message": "Job not found or unauthorized."}), 404
+
+    if job_entry.status not in ['transcribed', 'editing']:
+        return jsonify({"status": "error", "message": f"Video is not ready for editing (current status: {job_entry.status})."}), 400
+
+    video_url = url_for('download_file', filename=os.path.basename(job_entry.original_video_filepath), _external=True)
+    
+    srt_content = ""
+    try:
+        with open(job_entry.generated_srt_filepath, "r", encoding="utf-8") as f:
+            srt_content = f.read()
+    except FileNotFoundError:
+        return jsonify({"status": "error", "message": "Generated SRT file not found."}), 404
+
+    job_entry.status = 'editing' # Update status to indicate it's being edited
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "job_id": job_id,
+        "video_url": video_url,
+        "srt_content": srt_content,
+        "original_filename": job_entry.original_filename,
+        "resolution": job_entry.resolution,
+        "language": job_entry.language
+    })
+
 @app.route('/edit/<job_id>')
 @login_required
 def edit_video(job_id):
@@ -869,15 +902,7 @@ def edit_video(job_id):
     job_entry.status = 'editing' # Update status to indicate it's being edited
     db.session.commit()
 
-    return render_template(
-        'editor.html',
-        job_id=job_id,
-        video_url=video_url,
-        srt_content=srt_content,
-        original_filename=job_entry.original_filename,
-        resolution=job_entry.resolution, # Pass resolution for later burning
-        language=job_entry.language # Pass language for potential re-transcription if needed
-    )
+    return send_from_directory('static/dist', 'index.html')
 
 @app.route('/api/queue_stats')
 def queue_stats():
